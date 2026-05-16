@@ -1,0 +1,13 @@
+{
+  "name": "pull-all",
+  "version": "1.0.0",
+  "description": "對兄弟層所有 git repo 執行 git pull",
+  "main": "index.js",
+  "bin": {
+    "pull-all": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "license": "MIT"
+}
