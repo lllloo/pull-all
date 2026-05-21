@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: 讀取環境設定指定同步清單
 工具 SHALL 讀取專案目錄內的 `.env` 或執行環境中的 `PULL_ALL_INCLUDE`，若存在且包含 repo 名稱，則只對該清單內的 repo 執行 pull。

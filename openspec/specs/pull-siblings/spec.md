@@ -2,9 +2,7 @@
 
 ## Purpose
 對父目錄下所有兄弟層 git repo 並行執行 `git pull`，支援以 `.env` 白名單篩選同步清單，無設定時 fallback 為掃描全部 repo。
-
 ## Requirements
-
 ### Requirement: 掃描兄弟層 git repo
 工具 SHALL 掃描父目錄（執行目錄的上一層）下所有子資料夾，找出含有 `.git` 目錄的 repo。
 
@@ -42,20 +40,25 @@
 - **WHEN** 子資料夾不含 `.git`
 - **THEN** 顯示灰色跳過標記與資料夾名稱（或完全略過不顯示）
 
-### Requirement: 讀取設定檔指定同步清單
-工具 SHALL 讀取專案目錄內的 `pull-all.config.json`，若存在則只對 `include` 清單內的 repo 執行 pull。
-
-#### Scenario: 設定檔存在且清單有效
-- **WHEN** `pull-all.config.json` 存在且 `include` 陣列包含有效 repo 名稱
-- **THEN** 工具只對清單內的 repo 執行 pull，忽略其他兄弟層資料夾
-
-#### Scenario: 設定檔不存在（fallback）
-- **WHEN** `pull-all.config.json` 不存在
-- **THEN** 工具對所有偵測到的兄弟層 git repo 執行 pull（原本行為）
-
 ### Requirement: 處理設定清單中找不到的 repo
 工具 SHALL 對 `include` 清單中不存在於父目錄的項目顯示警告，並繼續處理其他 repo。
 
 #### Scenario: 清單中有不存在的 repo
 - **WHEN** `include` 內某個名稱在父目錄找不到對應資料夾
 - **THEN** 顯示黃色警告「找不到 xxx」，其餘 repo 正常執行，工具不中斷
+
+### Requirement: 讀取環境設定指定同步清單
+工具 SHALL 讀取專案目錄內的 `.env` 或執行環境中的 `PULL_ALL_INCLUDE`，若存在且包含 repo 名稱，則只對該清單內的 repo 執行 pull。
+
+#### Scenario: 環境設定存在且清單有效
+- **WHEN** `.env` 或執行環境中的 `PULL_ALL_INCLUDE` 包含有效 repo 名稱
+- **THEN** 工具只對清單內的 repo 執行 pull，忽略其他兄弟層資料夾
+
+#### Scenario: 環境設定不存在（fallback）
+- **WHEN** `.env` 不存在且執行環境未設定 `PULL_ALL_INCLUDE`
+- **THEN** 工具對所有偵測到的兄弟層 git repo 執行 pull（原本行為）
+
+#### Scenario: 環境設定為空（fallback）
+- **WHEN** `PULL_ALL_INCLUDE` 不存在或解析後沒有任何 repo 名稱
+- **THEN** 工具對所有偵測到的兄弟層 git repo 執行 pull（原本行為）
+
