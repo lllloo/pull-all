@@ -25,8 +25,13 @@ function isGitRepo(dir) {
   return fs.existsSync(path.join(dir, '.git'));
 }
 
+function resolveRoot() {
+  if (process.env.PULL_ALL_ROOT) return path.resolve(process.env.PULL_ALL_ROOT);
+  return path.dirname(process.cwd());
+}
+
 function loadEnvFile() {
-  const envPath = path.join(__dirname, '.env');
+  const envPath = path.join(resolveRoot(), '.env');
   if (!fs.existsSync(envPath)) return {};
 
   const env = {};
@@ -147,7 +152,7 @@ function checkbox(items, preselected = []) {
 async function checkAndPull(target) {
   const { name, fullPath } = target;
   const fetch = await fetchRepo(fullPath);
-  if (!fetch.ok) return { name, state: 'fetch-failed', stderr: fetch.stderr };
+  if (!fetch.ok) return { name, fullPath, type: 'fetch-failed', stderr: fetch.stderr };
   const status = await getStatus(fullPath);
   return { name, fullPath, ...status };
 }
@@ -158,7 +163,8 @@ async function pull(fullPath) {
 }
 
 async function main() {
-  const parentDir = path.resolve(__dirname, '..');
+  const parentDir = resolveRoot();
+  console.log(`${GRAY}root: ${parentDir}${RESET}`);
   const entries = fs.readdirSync(parentDir, { withFileTypes: true })
     .filter(e => e.isDirectory())
     .map(e => e.name);
@@ -195,16 +201,18 @@ async function main() {
   const results = await Promise.all(targets.map(checkAndPull));
 
   // 顯示摘要
+  const maxNameLen = Math.max(...results.map(r => r.name.length));
+  const pad = (name) => name.padEnd(maxNameLen);
   for (const r of results) {
-    if (r.state === 'fetch-failed') {
-      console.log(`${RED}✗ ${r.name}  fetch 失敗${RESET}`);
+    if (r.type === 'fetch-failed') {
+      console.log(`${RED}✗ ${pad(r.name)}  fetch 失敗${RESET}`);
       if (r.stderr) console.log(`  ${r.stderr}`);
     } else if (r.type === 'no-tracking') {
-      console.log(`${YELLOW}⚠ ${r.name}  無追蹤分支${RESET}`);
+      console.log(`${YELLOW}⚠ ${pad(r.name)}  無追蹤分支${RESET}`);
     } else if (r.type === 'behind') {
-      console.log(`${YELLOW}  ${r.name}  ${r.behind} commit${r.behind > 1 ? 's' : ''} behind${RESET}`);
+      console.log(`${YELLOW}  ${pad(r.name)}  ${r.behind} commit${r.behind > 1 ? 's' : ''} behind${RESET}`);
     } else {
-      console.log(`${GRAY}  ${r.name}  up to date${RESET}`);
+      console.log(`${GRAY}  ${pad(r.name)}  up to date${RESET}`);
     }
   }
 
@@ -263,7 +271,8 @@ function updateEnvFile(envPath, key, value) {
 }
 
 async function runInit() {
-  const parentDir = path.resolve(__dirname, '..');
+  const parentDir = resolveRoot();
+  console.log(`${GRAY}root: ${parentDir}${RESET}`);
   const repos = fs.readdirSync(parentDir, { withFileTypes: true })
     .filter(e => e.isDirectory() && isGitRepo(path.join(parentDir, e.name)))
     .map(e => e.name)
@@ -274,7 +283,7 @@ async function runInit() {
     return;
   }
 
-  const envPath = path.join(__dirname, '.env');
+  const envPath = path.join(parentDir, '.env');
   const fileEnv = loadEnvFile();
   const currentInclude = parseIncludeList(process.env.PULL_ALL_INCLUDE || fileEnv.PULL_ALL_INCLUDE);
   const preselected = currentInclude.filter(name => repos.includes(name));

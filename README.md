@@ -38,7 +38,7 @@ node --version
 git --version
 ```
 
-可直接執行，也可用 `npm link` 建立全域指令：
+建立全域指令（建議）：
 
 ```bash
 npm link
@@ -46,29 +46,47 @@ npm link
 
 ## 使用方式
 
-在 `pull-all` 目錄內執行：
+`pull-all` 以「當前工作目錄的父目錄」為掃描根目錄，因此可在 code 目錄底下任一 repo 內執行：
 
 ```bash
-node index.js
-```
-
-或使用 npm script：
-
-```bash
-npm start
-```
-
-若已執行 `npm link`：
-
-```bash
+cd ~/code/web
 pull-all
+# 掃 ~/code/ 底下的兄弟 repo
 ```
+
+或直接在 code 目錄底下：
+
+```bash
+cd ~/code/pull-all
+pull-all
+# 一樣掃 ~/code/ 底下
+```
+
+未 `npm link` 也可：
+
+```bash
+node ~/code/pull-all/index.js   # 仍以 cwd 父目錄為準
+npm start                        # 在 pull-all/ 目錄內
+```
+
+### 用 `PULL_ALL_ROOT` 明確指定根目錄
+
+從任意位置都想固定掃同一坨 repo（如 CI、cron、跨機 dotfiles），用 `PULL_ALL_ROOT` 直接指定根目錄（**不取父目錄**，掃這個目錄底下的子資料夾）：
+
+```bash
+PULL_ALL_ROOT=~/code pull-all
+PULL_ALL_ROOT=/srv/projects pull-all
+```
+
+執行時頂部會印出實際解析的 root 路徑，方便確認沒走錯地方。
 
 ## 設定
 
+`.env` 寫在**掃描根目錄**（cwd 父目錄或 `PULL_ALL_ROOT`），不寫在 `pull-all/` 內。
+
 ### 快速初始化（建議）
 
-執行 `init` 指令，互動式勾選要追蹤的 repo，自動寫入 `.env`：
+執行 `init` 指令，互動式勾選要追蹤的 repo，自動寫入掃描根目錄下的 `.env`：
 
 ```bash
 node index.js init
@@ -109,7 +127,7 @@ PULL_ALL_INCLUDE=web,common node index.js
 
 ## 執行流程
 
-1. 掃描父目錄或 `PULL_ALL_INCLUDE` 指定的 repo。
+1. 掃描根目錄（`PULL_ALL_ROOT` 或 cwd 父目錄）下的 repo，套用 `PULL_ALL_INCLUDE` 白名單。
 2. 對每個 repo 執行 `git fetch`。
 3. 用 `git rev-list HEAD..@{u} --count` 判斷是否落後追蹤分支。
 4. 列出狀態摘要。
@@ -118,11 +136,12 @@ PULL_ALL_INCLUDE=web,common node index.js
 ## 輸出範例
 
 ```text
+root: /Users/barney/code
 正在檢查 3 個 repo 狀態...
 
-  web  up to date
+  web     up to date
   common  2 commits behind
-⚠ note  無追蹤分支
+⚠ note    無追蹤分支
 
 1 個 repo 需要更新，要 pull 嗎？[y/N] y
 
@@ -143,6 +162,16 @@ npm start
 # 只同步指定 repo（臨時覆蓋）
 PULL_ALL_INCLUDE=web,common node index.js
 ```
+
+## 遷移指引
+
+舊版（`__dirname` 為基準）把 `.env` 寫在 `pull-all/` 內。新版改放在**掃描根目錄**（cwd 父目錄或 `PULL_ALL_ROOT`），請手動搬一次：
+
+```bash
+mv ~/code/pull-all/.env ~/code/.env
+```
+
+之後 `pull-all` 在 `~/code/` 底下任一 repo 內執行都能讀到。若先前是 `cd pull-all && node index.js` 的用法，行為不變（cwd 父目錄 = `~/code/`）。
 
 ## 授權
 

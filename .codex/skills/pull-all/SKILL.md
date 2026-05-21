@@ -1,26 +1,35 @@
 ---
 name: pull-all
-description: 檢查並更新 /Users/barney/code/ 底下所有 git repo。fetch 後顯示誰落後，詢問確認後 pull。觸發關鍵詞：pull all、同步 repo、更新所有 repo、/pull-all。
+description: 檢查並更新掃描根目錄底下所有 git repo。fetch 後顯示誰落後，詢問確認後 pull。觸發關鍵詞：pull all、同步 repo、更新所有 repo、/pull-all。
 license: MIT
 metadata:
   author: barney
-  version: "1.0"
+  version: "1.1"
 ---
 
 你是 pull-all 工具。執行以下步驟，不要跳過確認流程。
 
+## 0. 解析掃描根目錄（root）
+
+依下列優先序決定 `<root>`：
+
+1. 若環境變數 `PULL_ALL_ROOT` 有值 → 用該路徑。
+2. 否則 → 取當前工作目錄的父目錄（`dirname $PWD`）。
+
+後續所有 `<root>` 與 `<name>` 一律以此解析結果為準。執行前先告知使用者 `root: <root>`，方便確認沒走錯地方。
+
 ## 1. 讀取設定
 
-讀 `/Users/barney/code/pull-all/.env`，取得 `PULL_ALL_INCLUDE`（逗號分隔的 repo 名稱清單）。
+讀 `<root>/.env`，取得 `PULL_ALL_INCLUDE`（逗號分隔的 repo 名稱清單）。
 
-若 .env 不存在或 `PULL_ALL_INCLUDE` 為空，掃描 `/Users/barney/code/` 底下所有含 `.git/` 的目錄。
+若 .env 不存在或 `PULL_ALL_INCLUDE` 為空，掃描 `<root>/` 底下所有含 `.git/` 的目錄。
 
 ## 2. Fetch（並行）
 
 對每個目標 repo 執行：
 
 ```bash
-git -C /Users/barney/code/<name> fetch 2>&1
+git -C <root>/<name> fetch 2>&1
 ```
 
 記錄失敗的 repo。
@@ -30,7 +39,7 @@ git -C /Users/barney/code/<name> fetch 2>&1
 對每個 fetch 成功的 repo 執行：
 
 ```bash
-git -C /Users/barney/code/<name> rev-list HEAD..@{u} --count 2>&1
+git -C <root>/<name> rev-list HEAD..@{u} --count 2>&1
 ```
 
 - 數字 > 0 → behind（需要 pull）
@@ -65,7 +74,7 @@ git -C /Users/barney/code/<name> rev-list HEAD..@{u} --count 2>&1
 對需要更新的 repo 執行：
 
 ```bash
-git -C /Users/barney/code/<name> pull 2>&1
+git -C <root>/<name> pull 2>&1
 ```
 
 輸出結果：
