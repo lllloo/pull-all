@@ -1,3 +1,10 @@
+# init-command Spec
+
+## Purpose
+提供 `pull-all init` 互動式 checkbox 介面，讓使用者勾選要同步的 repo，並將結果寫入 `.env` 的 `PULL_ALL_INCLUDE`。
+
+## Requirements
+
 ### Requirement: init subcommand 路由
 執行 `pull-all init` 時，系統 SHALL 進入初始化流程而非主要 pull 流程。
 

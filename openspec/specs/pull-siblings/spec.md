@@ -1,5 +1,8 @@
 # pull-siblings Spec
 
+## Purpose
+對父目錄下所有兄弟層 git repo 並行執行 `git pull`，支援以 `.env` 白名單篩選同步清單，無設定時 fallback 為掃描全部 repo。
+
 ## Requirements
 
 ### Requirement: 掃描兄弟層 git repo

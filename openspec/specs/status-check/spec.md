@@ -1,5 +1,8 @@
 # status-check Spec
 
+## Purpose
+在 `git pull` 之前先並行 `git fetch` 並顯示各 repo 落後狀態，讓使用者確認後再決定是否 pull，避免無謂的網路操作與意外更新。
+
 ## Requirements
 
 ### Requirement: 並行 fetch 所有目標 repo
