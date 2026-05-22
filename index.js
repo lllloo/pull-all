@@ -71,11 +71,63 @@ async function fetchRepo(dir) {
   return { ok: !err, stderr };
 }
 
-async function getStatus(dir) {
-  const { err, stdout } = await sh('git rev-list HEAD..@{u} --count', dir);
-  if (err) return { type: 'no-tracking' };
-  const behind = parseInt(stdout, 10);
-  return { type: behind > 0 ? 'behind' : 'uptodate', behind };
+async function isEmptyRepo(dir) {
+  const { err } = await sh('git rev-parse --verify --quiet HEAD', dir);
+  return !!err;
+}
+
+async function getCurrentBranch(dir) {
+  const { err, stdout } = await sh('git symbolic-ref --short HEAD', dir);
+  if (!err && stdout) return { detached: false, name: stdout };
+  const { stdout: sha } = await sh('git rev-parse --short HEAD', dir);
+  return { detached: true, sha };
+}
+
+async function getDefaultBranch(dir) {
+  const { err, stdout } = await sh('git symbolic-ref --short refs/remotes/origin/HEAD', dir);
+  if (!err && stdout) {
+    const idx = stdout.indexOf('/');
+    return idx === -1 ? stdout : stdout.slice(idx + 1);
+  }
+  const { err: noMain } = await sh('git rev-parse --verify --quiet refs/heads/main', dir);
+  if (!noMain) return 'main';
+  const { err: noMaster } = await sh('git rev-parse --verify --quiet refs/heads/master', dir);
+  if (!noMaster) return 'master';
+  return null;
+}
+
+async function getAhead(dir, branch) {
+  const { err, stdout } = await sh(`git rev-list ${branch} --not --remotes --count`, dir);
+  if (err) return 0;
+  const n = parseInt(stdout, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function hasUpstream(dir, branch) {
+  const { err } = await sh(`git rev-parse --verify --quiet ${branch}@{u}`, dir);
+  return !err;
+}
+
+async function getBehind(dir, branch) {
+  if (!(await hasUpstream(dir, branch))) return null;
+  const { err, stdout } = await sh(`git rev-list ${branch}..${branch}@{u} --count`, dir);
+  if (err) return null;
+  const n = parseInt(stdout, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function getBranchStatus(dir, branch) {
+  const upstream = await hasUpstream(dir, branch);
+  const ahead = await getAhead(dir, branch);
+  const behind = upstream ? (await getBehind(dir, branch)) ?? 0 : 0;
+  return { ahead, behind, hasUpstream: upstream };
+}
+
+async function isDirty(dir) {
+  const { err, stdout } = await sh('git status --porcelain', dir);
+  if (err || !stdout) return false;
+  const lines = stdout.split(/\r?\n/).filter(l => l && !l.startsWith('??'));
+  return lines.length > 0;
 }
 
 function ask(question) {
@@ -180,17 +232,156 @@ async function cloneRepo(owner, name, rootDir) {
   return { name, ok: !err, stderr };
 }
 
-async function checkAndPull(target) {
+async function checkRepo(target) {
   const { name, fullPath } = target;
+
+  if (await isEmptyRepo(fullPath)) {
+    return { name, fullPath, type: 'empty' };
+  }
+
   const fetch = await fetchRepo(fullPath);
-  if (!fetch.ok) return { name, fullPath, type: 'fetch-failed', stderr: fetch.stderr };
-  const status = await getStatus(fullPath);
-  return { name, fullPath, ...status };
+  if (!fetch.ok) {
+    return { name, fullPath, type: 'fetch-failed', stderr: fetch.stderr };
+  }
+
+  const current = await getCurrentBranch(fullPath);
+  const defaultBranch = await getDefaultBranch(fullPath);
+  const dirty = await isDirty(fullPath);
+
+  let currentStatus = null;
+  if (!current.detached) {
+    currentStatus = await getBranchStatus(fullPath, current.name);
+  }
+
+  let defaultStatus = null;
+  const sameAsCurrent = !current.detached && defaultBranch === current.name;
+  if (defaultBranch && !sameAsCurrent) {
+    defaultStatus = await getBranchStatus(fullPath, defaultBranch);
+  }
+
+  return {
+    name,
+    fullPath,
+    type: 'normal',
+    current,
+    defaultBranch,
+    sameAsCurrent,
+    noDefault: defaultBranch === null,
+    currentStatus,
+    defaultStatus,
+    dirty,
+  };
 }
 
 async function pull(fullPath) {
   const { err, stdout, stderr } = await sh('git pull', fullPath);
   return { err, stdout, stderr };
+}
+
+function formatBranchSegment({ ahead, behind, dirty }) {
+  const parts = [];
+  if (ahead > 0) parts.push(`⇡${ahead}`);
+  if (behind > 0) parts.push(`⇣${behind}`);
+  if (parts.length === 0) parts.push('✓');
+  if (dirty) parts.push('*');
+  return parts.join(' ');
+}
+
+function branchLabel(name, hasUpstream) {
+  return hasUpstream ? `(${name})` : `(${name} †)`;
+}
+
+function pickColor({ behind, dirty, ahead, hasUpstream }) {
+  if (behind > 0) return YELLOW;
+  if (dirty || ahead > 0 || !hasUpstream) return '';
+  return GRAY;
+}
+
+function renderRepo(r, maxNameLen) {
+  const pad = (s) => s.padEnd(maxNameLen);
+  const blank = ' '.repeat(maxNameLen);
+
+  if (r.type === 'empty') {
+    return [`${GRAY}  ${pad(r.name)}  (empty)${RESET}`];
+  }
+  if (r.type === 'fetch-failed') {
+    const out = [`${RED}✗ ${pad(r.name)}  fetch 失敗${RESET}`];
+    if (r.stderr) out.push(`  ${r.stderr}`);
+    return out;
+  }
+
+  const lines = [];
+
+  // 判斷 default / current 是否「有事」
+  let defaultHasEvent = false;
+  if (r.defaultStatus) {
+    const { ahead, behind, hasUpstream } = r.defaultStatus;
+    defaultHasEvent = ahead > 0 || behind > 0 || !hasUpstream;
+  }
+
+  let currentHasEvent = false;
+  if (!r.current.detached && r.currentStatus) {
+    const { ahead, behind, hasUpstream } = r.currentStatus;
+    currentHasEvent = ahead > 0 || behind > 0 || !hasUpstream || r.dirty;
+  }
+
+  // current == default：只列一條
+  if (r.sameAsCurrent) {
+    const { ahead, behind, hasUpstream } = r.currentStatus;
+    const seg = formatBranchSegment({ ahead, behind, dirty: r.dirty });
+    const color = pickColor({ behind, dirty: r.dirty, ahead, hasUpstream });
+    lines.push(`${color}  ${pad(r.name)}  ${seg}  ${branchLabel(r.current.name, hasUpstream)}${RESET}`);
+    return lines;
+  }
+
+  // 無 default branch
+  if (r.noDefault) {
+    lines.push(`${YELLOW}⚠ ${pad(r.name)}  無預設分支${RESET}`);
+    if (r.current.detached) {
+      lines.push(`  ${blank}  (HEAD@${r.current.sha}, detached)${r.dirty ? ' *' : ''}`);
+    } else if (r.currentStatus) {
+      const { ahead, behind, hasUpstream } = r.currentStatus;
+      const seg = formatBranchSegment({ ahead, behind, dirty: r.dirty });
+      const color = pickColor({ behind, dirty: r.dirty, ahead, hasUpstream });
+      lines.push(`${color}  ${blank}  ${seg}  ${branchLabel(r.current.name, hasUpstream)}${RESET}`);
+    }
+    return lines;
+  }
+
+  // current ≠ default：兩條都可能要列
+  const showCurrent = currentHasEvent;
+  const showDefault = defaultHasEvent || !showCurrent;
+  let firstLine = true;
+  const repoCol = () => (firstLine ? pad(r.name) : blank);
+
+  if (showDefault && r.defaultStatus) {
+    const { ahead, behind, hasUpstream } = r.defaultStatus;
+    const seg = formatBranchSegment({ ahead, behind, dirty: false });
+    const color = pickColor({ behind, dirty: false, ahead, hasUpstream });
+    lines.push(`${color}  ${repoCol()}  ${seg}  ${branchLabel(r.defaultBranch, hasUpstream)}${RESET}`);
+    firstLine = false;
+  }
+
+  if (showCurrent) {
+    if (r.current.detached) {
+      const dirtyMark = r.dirty ? ' *' : '';
+      lines.push(`${GRAY}  ${repoCol()}     (HEAD@${r.current.sha}, detached)${dirtyMark}${RESET}`);
+    } else if (r.currentStatus) {
+      const { ahead, behind, hasUpstream } = r.currentStatus;
+      const seg = formatBranchSegment({ ahead, behind, dirty: r.dirty });
+      const color = pickColor({ behind, dirty: r.dirty, ahead, hasUpstream });
+      lines.push(`${color}  ${repoCol()}  ${seg}  ${branchLabel(r.current.name, hasUpstream)}${RESET}`);
+    }
+    firstLine = false;
+  }
+
+  return lines;
+}
+
+function formatSkippedNames(names) {
+  const shown = names.slice(0, 3).join(', ');
+  const more = names.length > 3 ? ` +${names.length - 3} more` : '';
+  return `${shown}${more}`;
 }
 
 async function main() {
@@ -229,28 +420,36 @@ async function main() {
 
   console.log(`正在檢查 ${targets.length} 個 repo 狀態...\n`);
 
-  const results = await Promise.all(targets.map(checkAndPull));
+  const results = await Promise.all(targets.map(checkRepo));
 
-  // 顯示摘要
   const maxNameLen = Math.max(...results.map(r => r.name.length));
-  const pad = (name) => name.padEnd(maxNameLen);
   for (const r of results) {
-    if (r.type === 'fetch-failed') {
-      console.log(`${RED}✗ ${pad(r.name)}  fetch 失敗${RESET}`);
-      if (r.stderr) console.log(`  ${r.stderr}`);
-    } else if (r.type === 'no-tracking') {
-      console.log(`${YELLOW}⚠ ${pad(r.name)}  無追蹤分支${RESET}`);
-    } else if (r.type === 'behind') {
-      console.log(`${YELLOW}  ${pad(r.name)}  ${r.behind} commit${r.behind > 1 ? 's' : ''} behind${RESET}`);
-    } else {
-      console.log(`${GRAY}  ${pad(r.name)}  up to date${RESET}`);
+    for (const line of renderRepo(r, maxNameLen)) {
+      console.log(line);
     }
   }
 
-  const toBePulled = results.filter(r => r.type === 'behind');
+  const isPullCandidate = (r) =>
+    r.type === 'normal'
+    && !r.current.detached
+    && r.currentStatus
+    && r.currentStatus.hasUpstream
+    && r.currentStatus.behind > 0;
+
+  const toBePulled = results.filter(r => isPullCandidate(r) && !r.dirty);
+  const skippedDirty = results.filter(r => isPullCandidate(r) && r.dirty);
+
+  if (skippedDirty.length > 0) {
+    const names = skippedDirty.map(r => r.name);
+    console.log(`\n${YELLOW}⊘ 跳過 ${skippedDirty.length} 個 dirty repo: ${formatSkippedNames(names)}${RESET}`);
+  }
 
   if (toBePulled.length === 0) {
-    console.log(`\n${GREEN}所有 repo 已是最新。${RESET}`);
+    if (skippedDirty.length > 0) {
+      console.log(`${GRAY}沒有可 pull 的 repo（dirty 已跳過）。${RESET}`);
+    } else {
+      console.log(`\n${GREEN}所有 repo 已是最新。${RESET}`);
+    }
     return;
   }
 

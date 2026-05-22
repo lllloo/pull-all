@@ -130,25 +130,53 @@ PULL_ALL_INCLUDE=web,common node index.js
 ## 執行流程
 
 1. 掃描根目錄（`PULL_ALL_ROOT` 或 cwd 父目錄）下的 repo，套用 `PULL_ALL_INCLUDE` 白名單。
-2. 對每個 repo 執行 `git fetch`。
-3. 用 `git rev-list HEAD..@{u} --count` 判斷是否落後追蹤分支。
-4. 列出狀態摘要。
-5. 只有存在 behind repo 時，才詢問是否執行 `git pull`。
+2. 對每個 repo：偵測是否為空 repo（無 commit）→ 並行 `git fetch` → 偵測 default branch（`origin/HEAD` → `main` → `master`）→ 計算 default 與 current 兩條 branch 的 ahead / behind → 偵測 working tree dirty。
+3. 列出狀態摘要（緊湊符號，見下方圖例）。
+4. 只對「current branch 有 upstream + ⇣ > 0 + working tree clean」的 repo 詢問是否 `git pull`。
+5. **dirty repo 永遠不被 pull**：current branch 落後遠端、但 working tree 有未提交變動的 repo，會自動從 pull 名單剔除（顯示 `⊘ 跳過 N 個 dirty repo`），不問也不執行。
 
 ## 輸出範例
 
 ```text
 root: /Users/barney/code
-正在檢查 3 個 repo 狀態...
+正在檢查 5 個 repo 狀態...
 
-  web     up to date
-  common  2 commits behind
-⚠ note    無追蹤分支
+  web      ✓                (main)
+  common   ⇣2               (main)
+  note     ⇡3               (feat-export †)
+  api      ⇣2               (main)
+           ⇡1               (feat-x)
+  docs     ✓ *              (main)
+
+⊘ 跳過 1 個 dirty repo: docs
 
 1 個 repo 需要更新，要 pull 嗎？[y/N] y
 
 ✓ common
 ```
+
+### 圖例
+
+| 符號 | 意義 |
+| --- | --- |
+| `✓` | 完全同步且 working tree clean |
+| `⇡N` | 本地領先 remote N commits（未上傳） |
+| `⇣N` | 本地落後 remote N commits |
+| `*` | working tree dirty（modified 或 staged 變動，untracked 不算） |
+| `†` | 該 branch 沒有 upstream tracking（從未 push） |
+| `(empty)` | repo 無任何 commit |
+| `(HEAD@<sha>, detached)` | detached HEAD 狀態 |
+| `⚠ 無預設分支` | 找不到 `origin/HEAD`、`main`、`master` 任一 |
+| `⊘` | 從 pull 名單剔除（dirty + behind） |
+| `✗` | fetch 或 pull 失敗 |
+
+### 行為細節
+
+- 只掃 default branch（main/master）與 current branch 兩條，不掃全部 local branches。
+- default branch 的 ahead/behind 是**純資訊**：`git pull` 只動 current branch，工具不會自動更新 default。
+- current branch 與 default 同名時，狀態行只顯示一條。
+- 兩條 branch 都沒事（`✓`、無 dirty、有 upstream）時，只列 default 一條當代表，抑制雜訊。
+- dirty 永遠標在 current branch 那一行（即使 current 本身是 `✓`）。
 
 ## 補回缺漏 repo（`pull-all clone`）
 

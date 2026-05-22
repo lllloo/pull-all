@@ -1,9 +1,4 @@
-# status-check Spec
-
-## Purpose
-在 `git pull` 之前先並行 `git fetch` 並顯示各 repo 的同步狀態，包含 current 與 default 兩條 branch 的 ahead/behind、working tree dirty、以及 branch 是否有 upstream。讓使用者在 pull 前同時掌握「需要更新」與「有未上傳變動」兩個維度，避免無謂的網路操作、意外更新與 dirty 工作被攪動。
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: 並行 fetch 所有目標 repo
 工具 SHALL 在顯示狀態前，對所有目標 repo 並行執行 `git fetch`。空 repo（無任何 commit）SHALL 跳過 fetch 與所有後續狀態比較。
@@ -110,6 +105,8 @@
 #### Scenario: 所有 repo 都不需要 pull
 - **WHEN** 沒有任何 repo 同時滿足三條件（包含全部 clean、無 behind、或全 dirty）
 - **THEN** 顯示「所有 repo 已是最新」並直接結束，不詢問
+
+## ADDED Requirements
 
 ### Requirement: 偵測 default branch
 工具 SHALL 對每個非空 repo 嘗試判定 default branch，依下列順序：(1) `git symbolic-ref --short refs/remotes/origin/HEAD` 成功，取其指向的 branch 名；(2) `git rev-parse --verify --quiet refs/heads/main` 成功；(3) `git rev-parse --verify --quiet refs/heads/master` 成功；(4) 三者皆失敗則無 default branch。
