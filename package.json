@@ -8,7 +8,9 @@
   },
   "scripts": {
     "start": "node index.js",
-    "init": "node index.js init"
+    "init": "node index.js init",
+    "clone": "node index.js clone",
+    "help": "node index.js help"
   },
   "license": "MIT"
 }
