@@ -339,7 +339,12 @@ function updateEnvFile(envPath, key, value) {
     }
   }
 
-  fs.writeFileSync(envPath, lines.join('\n'));
+  try {
+    fs.writeFileSync(envPath, lines.join('\n'));
+  } catch (e) {
+    console.error(`${RED}✗ 無法寫入 ${envPath}：${e.message}${RESET}`);
+    process.exit(1);
+  }
 }
 
 async function main() {
@@ -534,7 +539,8 @@ Commands:
   pull-all help     顯示此說明
 
 Options:
-  -h, --help        顯示此說明`);
+  -h, --help        顯示此說明
+  -v, --version     顯示版本號`);
 }
 
 function dispatch(cmd) {
