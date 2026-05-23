@@ -62,7 +62,4 @@
 - **WHEN** pull-all repo 根目錄內無 `.env` 且執行環境未設定 `PULL_ALL`
 - **THEN** 工具對所有偵測到的兄弟層 git repo 執行 pull
 
-#### Scenario: init 寫入新變數名稱
-- **WHEN** 使用者執行 `pull-all init`
-- **THEN** 工具將選擇結果寫入 `.env` 的 `PULL_ALL` key，不再寫 `PULL_ALL_INCLUDE`
 

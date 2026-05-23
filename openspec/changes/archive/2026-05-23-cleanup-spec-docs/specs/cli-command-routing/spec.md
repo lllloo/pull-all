@@ -1,10 +1,9 @@
-# cli-command-routing Specification
+## MODIFIED Requirements
 
-## Purpose
-集中定義 CLI 入口的路由規則，確保每個子命令在進入實際處理前明確分派，防止未知指令誤觸 git 操作。
-## Requirements
 ### Requirement: CLI command dispatch
-系統 SHALL 根據第一個 CLI argument 明確選擇流程。未帶 argument 時 SHALL 執行主要 pull 流程；`init` SHALL 執行初始化流程；`clone` SHALL 執行 clone 流程；help 指令 SHALL 顯示說明；未知指令 MUST 在任何 repo 掃描、`git fetch`、`git pull`、或 `gh` 檢查前停止。
+（需求內容不變，僅補寫 spec 檔的 Purpose 欄位。）
+
+Purpose 應補為：集中定義 CLI 入口的路由規則，確保每個子命令在進入實際處理前明確分派，防止未知指令誤觸 git 操作。
 
 #### Scenario: 未帶 argument
 - **WHEN** 使用者執行 `pull-all`
@@ -25,4 +24,3 @@
 #### Scenario: unknown command
 - **WHEN** 使用者執行未支援的子命令，例如 `pull-all typo`
 - **THEN** 系統顯示未知指令錯誤與簡短用法，並以非 0 exit code 結束，且不執行 repo 掃描、`git fetch`、`git pull`、或 `gh` 檢查
-

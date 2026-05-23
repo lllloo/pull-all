@@ -1,3 +1,9 @@
+# nested-repo-discovery Specification
+
+## Purpose
+定義 `runInit()` 掃描巢狀 git repo 的邏輯，包含 parent/child 格式的選單顯示、縮排規則、以及 `PULL_ALL` 寫入格式，讓使用者能在 init 選單中看到並選取巢狀的 repo。
+
+## Requirements
 ### Requirement: init 掃描一層巢狀 git repo
 `runInit()` 掃描 `parentDir` 第一層目錄時，只處理**是** git repo 的目錄。對每個第一層 git repo，繼續往下一層掃描，將發現的 git repo 以 `parent/child` 格式加入選單。非 git 的第一層目錄完全跳過（不加入選單，不掃子目錄）。
 

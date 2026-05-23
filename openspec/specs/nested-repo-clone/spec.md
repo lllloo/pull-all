@@ -1,3 +1,9 @@
+# nested-repo-clone Specification
+
+## Purpose
+定義 `runClone()` 對含 `/` 的 parent/child 路徑格式的 clone 行為，包含自動建立 parent 目錄的邏輯，確保巢狀 repo 能正確 clone 至對應的本機子目錄。
+
+## Requirements
 ### Requirement: clone 支援 parent/child 路徑格式
 `runClone()` SHALL接受 `PULL_ALL` 中含 `/` 的項目，以路徑最後一段作為 GitHub repo 名，將其 clone 至正確的本機子目錄。
 
