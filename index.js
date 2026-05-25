@@ -351,30 +351,26 @@ function updateEnvFile(envPath, key, value) {
 async function main() {
   const parentDir = resolveRoot();
   console.log(`${GRAY}root: ${parentDir}${RESET}`);
-  const entries = fs.readdirSync(parentDir, { withFileTypes: true })
-    .filter(e => e.isDirectory())
-    .map(e => e.name);
 
   const include = parseInclude(env('PULL_ALL'));
-  let targets = [];
+  if (include.length === 0) {
+    console.log(`${YELLOW}⚠ 尚未設定要追蹤的 repo。${RESET}`);
+    console.log(`  請執行 ${BOLD}pull-all init${RESET} 勾選，或在 .env 設定 PULL_ALL=repo1,repo2`);
+    return;
+  }
 
-  if (include.length > 0) {
-    for (const name of include) {
-      const fullPath = path.join(parentDir, name);
-      if (!fs.existsSync(fullPath)) {
-        console.log(`${YELLOW}⚠ 找不到 ${name}${RESET}`);
-        continue;
-      }
-      if (!isGitRepo(fullPath)) {
-        console.log(`${GRAY}— ${name} 不是 git repo，跳過${RESET}`);
-        continue;
-      }
-      targets.push({ name, fullPath });
+  const targets = [];
+  for (const name of include) {
+    const fullPath = path.join(parentDir, name);
+    if (!fs.existsSync(fullPath)) {
+      console.log(`${YELLOW}⚠ 找不到 ${name}${RESET}`);
+      continue;
     }
-  } else {
-    targets = entries
-      .map(name => ({ name, fullPath: path.join(parentDir, name) }))
-      .filter(({ fullPath }) => isGitRepo(fullPath));
+    if (!isGitRepo(fullPath)) {
+      console.log(`${GRAY}— ${name} 不是 git repo，跳過${RESET}`);
+      continue;
+    }
+    targets.push({ name, fullPath });
   }
 
   if (targets.length === 0) {
@@ -468,11 +464,14 @@ async function runInit() {
 
   const chosen = await checkbox(repos, preselected);
 
-  updateEnvFile(envPath, 'PULL_ALL', chosen.join(','));
+  if (chosen.length === 0) {
+    console.log(`${YELLOW}未選任何 repo，已取消。${RESET}`);
+    return;
+  }
 
-  const display = chosen.length > 0 ? chosen.join(', ') : '（全部）';
+  updateEnvFile(envPath, 'PULL_ALL', chosen.join(','));
   console.log(`${GREEN}✓ 已寫入 ${envPath}${RESET}`);
-  console.log(`  PULL_ALL=${display}`);
+  console.log(`  PULL_ALL=${chosen.join(', ')}`);
 }
 
 async function runClone() {
@@ -489,7 +488,7 @@ async function runClone() {
 
   const include = parseInclude(env('PULL_ALL'));
   if (include.length === 0) {
-    console.log('.env 未設定 PULL_ALL，無 repo 可 clone。');
+    console.log(`${YELLOW}尚未設定要追蹤的 repo，請先執行 pull-all init 勾選。${RESET}`);
     return;
   }
 

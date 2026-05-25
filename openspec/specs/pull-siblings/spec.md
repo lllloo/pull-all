@@ -1,7 +1,7 @@
 # pull-siblings Spec
 
 ## Purpose
-對父目錄下所有兄弟層 git repo 並行執行 `git pull`，支援以 `.env` 白名單篩選同步清單，無設定時 fallback 為掃描全部 repo。
+對父目錄下所有兄弟層 git repo 並行執行 `git pull`，以 `.env` 的 `PULL_ALL` 白名單指定同步清單；未設定時停下並引導執行 `pull-all init`，不掃描任何 repo。
 ## Requirements
 ### Requirement: 掃描兄弟層 git repo
 工具 SHALL 以 `path.dirname(__dirname)`（pull-all 工具 repo 的父目錄）作為固定掃描根目錄，掃描該目錄下所有子資料夾找出含有 `.git` 目錄的 repo。工具 MUST NOT 使用 `process.cwd()` 或環境變數作為掃描根解析依據。`PULL_ALL_ROOT` 環境變數 SHALL NOT 再被讀取。

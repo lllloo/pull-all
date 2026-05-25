@@ -122,7 +122,7 @@ PULL_ALL=web,common,obsidian,obsidian/obsidian-deploy,obsidian/obsidian-memory
 | 設定 | 行為 |
 | --- | --- |
 | 有 `PULL_ALL` | 只檢查清單內的 repo |
-| 無 `.env` 或 `PULL_ALL` 為空 | 檢查父目錄下所有 git repo |
+| 無 `.env` 或 `PULL_ALL` 未設定 | 停下並提示執行 `pull-all init` 勾選，不檢查任何 repo |
 | 清單內 repo 不存在 | 顯示警告，其他 repo 照常執行（用 `pull-all clone` 補回） |
 | 清單內目錄不是 git repo | 跳過該目錄 |
 
